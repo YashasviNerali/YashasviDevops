@@ -1,0 +1,189 @@
+<project name="JVx Application Archetype" 
+         default="start.complete"
+         xmlns:artifact="antlib:org.apache.maven.artifact.ant">
+
+  <!-- 
+    ***************************************************************** 
+  	* information   
+  	***************************************************************** 
+  	-->
+
+  <description>JVx Application Archetype</description>
+
+  <!-- 
+  	***************************************************************** 
+  	* global properties   
+  	***************************************************************** 
+  	-->
+
+  <property name="release.name" value="jvxapplication-archetype" />
+
+  <property name="app.package" value="com.sibvisions.demo" />
+  <property name="app.name" value="firstapp" />
+  <property name="app.version" value="0.1-SNAPSHOT" />
+  
+  <!-- 
+  	***************************************************************** 
+  	* general properties   
+  	***************************************************************** 
+  	-->
+
+  <property name="buildnumber" location="${basedir}/buildnumber" />
+  <property name="temp" location="${basedir}/temp" />
+
+  <property name="src" location="${basedir}/../src" />
+
+  <property name="release" location="${basedir}/release" />
+  
+  <!-- 
+  	***************************************************************** 
+  	* EXTERNAL TASKS   
+  	***************************************************************** 
+  	-->
+
+  <typedef resource="org/apache/maven/artifact/ant/antlib.xml" uri="antlib:org.apache.maven.artifact.ant" classpath="${basedir}/maven/maven-ant-tasks-2.1.3.jar" />
+  
+  <!-- 
+  	***************************************************************** 
+  	* logging   
+  	***************************************************************** 
+  	-->
+
+  <record name="build.log" />
+
+  <!-- 
+  	***************************************************************** 
+  	* INTERNAL TASKS   
+  	***************************************************************** 
+  	-->
+
+  <!--
+    * setup tasks
+    -->
+
+  <target name="proxy.check">
+    <condition property="proxy.enabled">
+      <and>
+        <socket server="10.0.0.1" port="3128"/>
+      </and>
+    </condition>
+  </target>
+  
+  <target name="proxy" depends="proxy.check" if="proxy.enabled">
+    <property name="proxy.host" value="10.0.0.1"/>
+    <property name="proxy.port" value="3128"/>
+    <property name="proxy.user" value=""/>
+    <property name="proxy.pass" value=""/>
+      
+    <setproxy proxyhost="${proxy.host}" proxyport="${proxy.port}" proxyuser="${proxy.user}" proxypassword="${proxy.password}"/>
+  </target>
+
+  <!-- 
+	* cleanup tasks 
+	-->
+
+  <target name="clean.start">
+    <delete dir="${temp}" />
+    <delete dir="${release}" />
+  </target>
+
+  <target name="clean.stop">
+    <delete dir="${temp}" />
+  </target>
+
+  <!-- 
+	* compile, build tasks 
+	-->
+
+  <target name="version">
+      
+    <!-- define late because of the classpath -->
+    <taskdef name="buildnr" classname="com.sibvisions.addons.ant.AntBuildNumber" classpath="${buildnumber}/addons.jar;${classes}" />
+    <buildnr buildfile="${buildnumber}/buildnr.properties" version="2.7" name="JVx Application Archetype"/>
+     
+  </target>
+
+  <target name="maven" depends="proxy, version">
+  
+    <property name="gpgexecutable" value="C:\Program Files (x86)\GNU\GnuPG\pub\gpg.exe" />
+
+    <!-- Maven coordinates -->
+    <property name="mvn.groupId" value="com.sibvisions" />
+  
+    <!-- artifacts' name, which follows the convention of Maven -->
+  	<property name="mvn.jvxapp.jar" value="${release}/maven/${release.name}-${build.version}.jar" />
+	<property name="mvn.jvxapp.sources.jar" value="${release}/maven/${release.name}-${build.version}-sources.jar" />
+	<property name="mvn.jvxapp.javadoc.jar" value="${release}/maven/${release.name}-${build.version}-javadoc.jar" />
+  
+    <!-- Maven snapshots and staging repository id and url -->
+	<property name="mvn.snapshotsrep.id" value="sonatype-nexus-snapshots" />
+	<property name="mvn.snapshotsrep.url" value="https://oss.sonatype.org/content/repositories/snapshots" />
+	<property name="mvn.stagingrep.id" value="sonatype-nexus-staging" />
+	<property name="mvn.stagingrep.url" value="https://oss.sonatype.org/service/local/staging/deploy/maven2" />
+  
+    <zip destfile="${mvn.jvxapp.jar}">
+      <zipfileset dir="${src}/main/resources"/>
+    </zip>
+    
+    <!-- 
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ~ JVx Client and Server 
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -->
+ 
+	<artifact:mvn pom="${basedir}/../pom.xml">
+		<arg value="org.apache.maven.plugins:maven-gpg-plugin:1.3:sign-and-deploy-file" />
+		<arg value="-Durl=${mvn.stagingrep.url}" />
+		<arg value="-DrepositoryId=${mvn.stagingrep.id}" />
+		<arg value="-DpomFile=pom.xml" />
+		<arg value="-Dfile=${mvn.jvxapp.jar}" />
+		<arg value="-Dpackaging=jar" />
+        <arg value="-Pgpg" />
+		<arg value="-Dgpg.executable=${gpgexecutable}" />
+	</artifact:mvn>
+	
+  </target>
+
+  <!-- 
+  	***************************************************************** 
+  	* PUBLIC START TASKS   
+  	***************************************************************** 
+  	-->
+
+  <target name="start.complete" depends="clean.start, maven, clean.stop" description="Creates the release and uploads to maven"/>
+  
+  <!-- 
+    First: use your IDE and do 
+    
+    * "Run" Maven clean
+    * "Run" Maven install
+    
+    If demo application is correct execute task "start.complete" 
+  -->
+  <target name="start.recreate" depends="version" description="Recreates the demo application with the archetype">
+      
+    <artifact:mvn pom="${basedir}/../pom.xml">
+      <arg value="clean"/>
+    </artifact:mvn>
+    
+    <artifact:mvn pom="${basedir}/../pom.xml">
+      <arg value="install"/>
+    </artifact:mvn>      
+    
+    <delete dir="${basedir}/${app.name}" />
+    
+    <artifact:mvn>
+      <arg value="archetype:generate"/>
+      <arg value="-DarchetypeGroupId=com.sibvisions.jvx"/>
+      <arg value="-DarchetypeArtifactId=jvxapplication-archetype"/>
+      <arg value="-DarchetypeVersion=${build.version}"/>
+      <arg value="-DgroupId=${app.package}"/>
+      <arg value="-DartifactId=${app.name}"/>
+      <arg value="-Dversion=${app.version}"/>
+    </artifact:mvn>
+    
+    <move file="${basedir}/${app.name}" todir="${release}" />
+    
+  </target>
+
+</project>

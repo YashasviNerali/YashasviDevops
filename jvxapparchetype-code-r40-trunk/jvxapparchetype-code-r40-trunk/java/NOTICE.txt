@@ -1,0 +1,5 @@
+JVx Application Archetype
+Copyright 2013 SIB Visions GmbH
+
+This product includes software developed by
+SIB Visions GmbH (http://www.sibvisions.com/).
